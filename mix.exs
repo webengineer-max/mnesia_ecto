@@ -14,7 +14,7 @@ defmodule Mnesia.Ecto.Mixfile do
   #
   # Type `mix help compile.app` for more information
   def application do
-    [applications: [:logger]]
+    [applications: [:logger, :ecto, :mnesia]]
   end
 
   # Dependencies can be Hex packages:
@@ -27,6 +27,6 @@ defmodule Mnesia.Ecto.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps do
-    []
+    [{:ecto, "~> 0.14.0"}]
   end
 end
