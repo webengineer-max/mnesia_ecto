@@ -46,7 +46,7 @@ defmodule Mnesia.Ecto do
   @doc """
   Deletes a sigle model with the given filters.
   """
-  def delete(_repo, {_prefix, table, _model}, filters, _autogenarate, _opts) do
+  def delete(_repo, %{source: {_prefix, table}}, filters, _auto_id, _opts) do
     tbl = String.to_atom(table)
     :mnesia.dirty_select(tbl, match_spec(tbl, filters))
     |> case do
