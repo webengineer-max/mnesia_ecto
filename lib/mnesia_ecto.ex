@@ -1,5 +1,6 @@
 defmodule Mnesia.Ecto do
 
+  alias Ecto.Migration.Table
 
   @behaviour Ecto.Adapter.Storage
 
@@ -64,4 +65,16 @@ defmodule Mnesia.Ecto do
     {:ok, []} = Application.ensure_all_started :mnesia_ecto
     {:ok, self}   # XXX despite spec allows just :ok, test fails without PID
   end
+
+  @behaviour Ecto.Adapter.Migration
+
+  def execute_ddl _repo, {:create, %Table{name: name}, columns}, _opts do
+    fields = for {:add, field, _type, _col_opts} <- columns do
+      field
+    end
+    {:atomic, :ok} = :mnesia.create_table name, [attributes: fields]
+    :ok
+  end
+
+  def supports_ddl_transaction?, do: false
 end
