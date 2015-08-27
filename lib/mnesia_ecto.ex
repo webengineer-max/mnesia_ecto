@@ -35,6 +35,18 @@ defmodule Mnesia.Ecto do
     end
   end
 
+  @doc false
+  def dump type, value do
+    Ecto.Type.dump type, value, &dump/2
+  end
+
+  @doc false
+  def insert _repo, %{source: {_prefix, table}}, fields, _autoid, _ret, _opts do
+    row = to_record(fields, table)
+    :ok = :mnesia.dirty_write row
+    {:ok, to_keyword row}
+  end
+
   @doc """
   Convert filters keyword into Erlang match specification for Mnesia table.
 
@@ -83,5 +95,8 @@ defmodule Mnesia.Ecto do
     :ok
   end
 
-  def supports_ddl_transaction?, do: false
+  @doc false
+  def supports_ddl_transaction? do
+    false
+  end
 end
