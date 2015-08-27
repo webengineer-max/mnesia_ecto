@@ -24,9 +24,9 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def delete(_repo, %{source: {_prefix, table}}, filters, _auto_id, _opts) do
-    tbl = String.to_atom(table)
-    :mnesia.dirty_select(tbl, match_spec(tbl, filters))
+  def delete _repo, %{source: {_prefix, table}}, filters, _autoid, _opts do
+    String.to_atom(table)
+    |> :mnesia.dirty_select(match_spec(table, filters))
     |> case do
       [] -> {:error, :stale}
       [row] ->
@@ -41,12 +41,18 @@ defmodule Mnesia.Ecto do
   Matching result would return the whole objects.
   """
   def match_spec table, filters do
-    [{match_head(table, filters), [], [:'$_']}]
+    [{to_record(filters, table, :_), [], [:'$_']}]
   end
 
-  defp match_head table, filters do
-    :mnesia.table_info(table, :attributes)
-    |> Enum.map(&Keyword.get(filters, &1, :_))
+  @doc """
+  Convert Keyword into table record.
+
+  Populate missed fields with default value.
+  """
+  defp to_record keyword, table, default \\ nil do
+    String.to_atom(table)
+    |> :mnesia.table_info(:attributes)
+    |> Enum.map(&Keyword.get(keyword, &1, default))
     |> Enum.into([table])
     |> List.to_tuple
   end
