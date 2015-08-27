@@ -4,11 +4,13 @@ defmodule Mnesia.Ecto do
 
   @behaviour Ecto.Adapter.Storage
 
+  @doc false
   def storage_up _opts do
     :mnesia.create_schema [node]
     :mnesia.start
   end
 
+  @doc false
   def storage_down _opts do
     :mnesia.stop
     :mnesia.delete_schema [node]
@@ -21,9 +23,7 @@ defmodule Mnesia.Ecto do
     :ok
   end
 
-  @doc """
-  Deletes a sigle model with the given filters.
-  """
+  @doc false
   def delete(_repo, %{source: {_prefix, table}}, filters, _auto_id, _opts) do
     tbl = String.to_atom(table)
     :mnesia.dirty_select(tbl, match_spec(tbl, filters))
@@ -31,7 +31,7 @@ defmodule Mnesia.Ecto do
       [] -> {:error, :stale}
       [row] ->
         :ok = :mnesia.dirty_delete_object row
-        {:ok, to_keyword(row)}
+        {:ok, to_keyword row}
     end
   end
 
@@ -40,7 +40,6 @@ defmodule Mnesia.Ecto do
 
   Matching result would return the whole objects.
   """
-  @spec match_spec(atom, Keyword.t) :: [{tuple, [], [:'$_']}]
   def match_spec table, filters do
     [{match_head(table, filters), [], [:'$_']}]
   end
@@ -61,6 +60,7 @@ defmodule Mnesia.Ecto do
     |> Enum.zip(values)
   end
 
+  @doc false
   def start_link _repo, _opts do
     {:ok, []} = Application.ensure_all_started :mnesia_ecto
     {:ok, self}   # XXX despite spec allows just :ok, test fails without PID
@@ -68,6 +68,7 @@ defmodule Mnesia.Ecto do
 
   @behaviour Ecto.Adapter.Migration
 
+  @doc false
   def execute_ddl _repo, {:create, %Table{name: name}, columns}, _opts do
     fields = for {:add, field, _type, _col_opts} <- columns do
       field
