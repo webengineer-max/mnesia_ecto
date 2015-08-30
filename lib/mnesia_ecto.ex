@@ -1,19 +1,22 @@
 defmodule Mnesia.Ecto do
+  @moduledoc """
+  Mnesia adapter for Ecto.
+  """
 
   alias Ecto.Migration.Table
 
   @behaviour Ecto.Adapter.Storage
 
   @doc false
-  def storage_up _opts do
-    :mnesia.create_schema [node]
+  def storage_up(_opts) do
+    :mnesia.create_schema([node])
     :mnesia.start
   end
 
   @doc false
-  def storage_down _opts do
+  def storage_down(_opts) do
     :mnesia.stop
-    :mnesia.delete_schema [node]
+    :mnesia.delete_schema([node])
   end
 
   @behaviour Ecto.Adapter
@@ -24,26 +27,27 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def delete _repo, %{source: {_prefix, table}}, filters, _autoid, _opts do
-    String.to_atom(table)
+  def delete(_repo, %{source: {_prefix, table}}, filters, _autoid, _opts) do
+    table
+    |> String.to_atom
     |> :mnesia.dirty_select(match_spec(table, filters))
     |> case do
       [] -> {:error, :stale}
       [row] ->
-        :ok = :mnesia.dirty_delete_object row
+        :ok = :mnesia.dirty_delete_object(row)
         {:ok, to_keyword row}
     end
   end
 
   @doc false
-  def dump type, value do
-    Ecto.Type.dump type, value, &dump/2
+  def dump(type, value) do
+    Ecto.Type.dump(type, value, &dump/2)
   end
 
   @doc false
-  def insert _repo, %{source: {_prefix, table}}, fields, _autoid, _ret, _opts do
+  def insert(_repo, %{source: {_prefix, table}}, fields, _autoid, _ret, _opts) do
     row = to_record(fields, table)
-    :ok = :mnesia.dirty_write row
+    :ok = :mnesia.dirty_write(row)
     {:ok, to_keyword row}
   end
 
@@ -52,7 +56,7 @@ defmodule Mnesia.Ecto do
 
   Matching result would return the whole objects.
   """
-  def match_spec table, filters do
+  def match_spec(table, filters) do
     [{to_record(filters, table, :_), [], [:'$_']}]
   end
 
@@ -61,8 +65,9 @@ defmodule Mnesia.Ecto do
 
   Populate missed fields with default value.
   """
-  defp to_record keyword, table, default \\ nil do
-    String.to_atom(table)
+  def to_record(keyword, table, default \\ nil) do
+    table
+    |> String.to_atom
     |> :mnesia.table_info(:attributes)
     |> Enum.map(&Keyword.get(keyword, &1, default))
     |> Enum.into([table])
@@ -72,31 +77,29 @@ defmodule Mnesia.Ecto do
   @doc """
   Convert Mnesia record object into Keyword.
   """
-  def to_keyword record do
-    [table | values] = Tuple.to_list record
+  def to_keyword(record) do
+    [table | values] = Tuple.to_list(record)
     :mnesia.table_info(table, :attributes)
     |> Enum.zip(values)
   end
 
   @doc false
-  def start_link _repo, _opts do
-    {:ok, []} = Application.ensure_all_started :mnesia_ecto
-    {:ok, self}   # XXX despite spec allows just :ok, test fails without PID
+  def start_link(_repo, _opts) do
+    {:ok, []} = Application.ensure_all_started(:mnesia_ecto)
+    {:ok, self}   # FIXME Despite spec allows just :ok, test fails without PID.
   end
 
   @behaviour Ecto.Adapter.Migration
 
   @doc false
-  def execute_ddl _repo, {:create, %Table{name: name}, columns}, _opts do
+  def execute_ddl(_repo, {:create, %Table{name: name}, columns}, _opts) do
     fields = for {:add, field, _type, _col_opts} <- columns do
       field
     end
-    {:atomic, :ok} = :mnesia.create_table name, [attributes: fields]
+    {:atomic, :ok} = :mnesia.create_table(name, [attributes: fields])
     :ok
   end
 
   @doc false
-  def supports_ddl_transaction? do
-    false
-  end
+  def supports_ddl_transaction?, do: false
 end
