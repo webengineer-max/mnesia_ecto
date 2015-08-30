@@ -27,7 +27,7 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def delete(_repo, %{source: {_prefix, table}}, filters, _autoid, _opts) do
+  def delete(_, %{source: {_, table}}, filters, _, _) do
     table
     |> String.to_atom
     |> :mnesia.dirty_select(match_spec(table, filters))
@@ -45,7 +45,7 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def insert(_repo, %{source: {_prefix, table}}, fields, _autoid, _ret, _opts) do
+  def insert(_, %{source: {_, table}}, fields, _, _, _) do
     row = to_record(fields, table)
     :ok = :mnesia.dirty_write(row)
     {:ok, to_keyword row}
@@ -84,7 +84,7 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def start_link(_repo, _opts) do
+  def start_link(_, _) do
     {:ok, []} = Application.ensure_all_started(:mnesia_ecto)
     {:ok, self}   # FIXME Despite spec allows just :ok, test fails without PID.
   end
@@ -92,8 +92,15 @@ defmodule Mnesia.Ecto do
   @behaviour Ecto.Adapter.Migration
 
   @doc false
-  def execute_ddl(_repo, {:create, %Table{name: name}, columns}, _opts) do
-    fields = for {:add, field, _type, _col_opts} <- columns do
+  def execute_ddl(repo,
+                  {:create_if_not_exists, table=%Table{name: name}, columns},
+                  opts) do
+    unless name in :mnesia.system_info(:tables) do
+      execute_ddl(repo, {:create, table, columns}, opts)
+    end
+  end
+  def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
+    fields = for {:add, field, _, _} <- columns do
       field
     end
     {:atomic, :ok} = :mnesia.create_table(name, [attributes: fields])
