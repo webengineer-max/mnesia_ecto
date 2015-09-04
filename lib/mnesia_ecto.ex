@@ -86,7 +86,7 @@ defmodule Mnesia.Ecto do
   @doc false
   def start_link(_, _) do
     {:ok, []} = Application.ensure_all_started(:mnesia_ecto)
-    {:ok, self}   # FIXME Despite spec allows just :ok, test fails without PID.
+    {:ok, self}
   end
 
   @behaviour Ecto.Adapter.Migration

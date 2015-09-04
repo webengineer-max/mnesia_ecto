@@ -27,6 +27,6 @@ defmodule Mnesia.Ecto.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps do
-    [{:ecto, "~> 1.0.0"}]
+    [{:ecto, git: "git@github.com:elixir-lang/ecto.git"}]
   end
 end
