@@ -66,11 +66,11 @@ defmodule Mnesia.Ecto do
   Populate missed fields with default value.
   """
   def to_record(keyword, table, default \\ nil) do
-    table
-    |> String.to_atom
+    name_atom = String.to_atom(table)
+    name_atom
     |> :mnesia.table_info(:attributes)
     |> Enum.map(&Keyword.get(keyword, &1, default))
-    |> Enum.into([table])
+    |> Enum.into([name_atom])
     |> List.to_tuple
   end
 
