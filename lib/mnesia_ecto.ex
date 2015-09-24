@@ -3,7 +3,11 @@ defmodule Mnesia.Ecto do
   Mnesia adapter for Ecto.
   """
 
+  alias Ecto.Migration.Index
   alias Ecto.Migration.Table
+  alias Ecto.Query
+  alias Ecto.Query.SelectExpr
+  alias Mnesia.Ecto.Query, as: MnesiaQuery
 
   @behaviour Ecto.Adapter.Storage
 
@@ -22,71 +26,88 @@ defmodule Mnesia.Ecto do
   @behaviour Ecto.Adapter
 
   @doc false
-  defmacro __before_compile__(_env) do
-    :ok
+  defmacro __before_compile__(_env), do: :ok
+
+  @doc false
+  def start_link(_, _) do
+    {:ok, []} = Application.ensure_all_started(:mnesia_ecto)
+    {:ok, self}
+  end
+
+  @doc false
+  def embed_id(_), do: Ecto.UUID.generate
+
+  @doc false
+  def dump(_, value), do: {:ok, value}
+
+  @doc false
+  def load(_, value), do: {:ok, value}
+
+  @doc false
+  def prepare(:all, %Query{
+      from: {table, _},
+      select: %SelectExpr{expr: fields},
+      wheres: wheres}) do
+    {:cache, {:all, MnesiaQuery.match_spec(table, fields, wheres: wheres)}}
+  end
+
+  def prepare(:delete_all, %Query{from: {table, _}}) do
+    {:cache, {:delete_all, table}}
+  end
+
+  @doc false
+  def execute(_, %{select: %{expr: expr}, sources: {{table, model}}}, {:all, [{match_head, guards, result}]}, params, _, _) do
+    spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
+    rows = table |> String.to_atom |> :mnesia.dirty_select(spec)
+    if expr == {:&, [], [0]} do
+      rows = rows |> Enum.map(&MnesiaQuery.row2model(&1, model))
+    end
+    {length(rows), rows}
+  end
+
+  def execute(_, _, {:delete_all, table}, _, nil, _) do
+    {:atomic, :ok} =
+      table
+      |> String.to_atom
+      |> :mnesia.clear_table
+  end
+
+  @doc false
+  def insert(repo, meta, fields, {field, :binary_id, _}, [], opts) do
+    with_id = Keyword.put(fields, field, embed_id(:foo))
+    insert(repo, meta, with_id, nil, [], opts)
+  end
+
+  def insert(_, %{source: {_, table}}, fields, nil, _, _) do
+    row = MnesiaQuery.to_record(fields, table)
+    :ok = :mnesia.dirty_write(row)
+    {:ok, MnesiaQuery.to_keyword(row)}
+  end
+
+  @doc false
+  def update(_, %{source: {_, table}}, _, filters, _, _, _) do
+    table
+    |> String.to_atom
+    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters))
+    |> case do
+      [] -> {:error, :stale}
+      [row] ->
+        :ok = :mnesia.dirty_delete_object(row)
+        {:ok, MnesiaQuery.to_keyword(row)}
+    end
   end
 
   @doc false
   def delete(_, %{source: {_, table}}, filters, _, _) do
     table
     |> String.to_atom
-    |> :mnesia.dirty_select(match_spec(table, filters))
+    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters))
     |> case do
       [] -> {:error, :stale}
       [row] ->
-        :ok = :mnesia.dirty_delete_object(row)
-        {:ok, to_keyword row}
+        :ok = :mnesia.dirty_write(row)
+        {:ok, MnesiaQuery.to_keyword(row)}
     end
-  end
-
-  @doc false
-  def dump(type, value) do
-    Ecto.Type.dump(type, value, &dump/2)
-  end
-
-  @doc false
-  def insert(_, %{source: {_, table}}, fields, _, _, _) do
-    row = to_record(fields, table)
-    :ok = :mnesia.dirty_write(row)
-    {:ok, to_keyword row}
-  end
-
-  @doc """
-  Convert filters keyword into Erlang match specification for Mnesia table.
-
-  Matching result would return the whole objects.
-  """
-  def match_spec(table, filters) do
-    [{to_record(filters, table, :_), [], [:'$_']}]
-  end
-
-  @doc """
-  Convert Keyword into table record.
-
-  Populate missed fields with default value.
-  """
-  def to_record(keyword, table, default \\ nil) do
-    name_atom = String.to_atom(table)
-    name_atom
-    |> :mnesia.table_info(:attributes)
-    |> Enum.map(&Keyword.get(keyword, &1, default))
-    |> Enum.into([name_atom])
-    |> List.to_tuple
-  end
-
-  @doc """
-  Convert Mnesia record object into Keyword.
-  """
-  def to_keyword(record) do
-    [table | values] = Tuple.to_list(record)
-    :mnesia.table_info(table, :attributes)
-    |> Enum.zip(values)
-  end
-
-  @doc false
-  def start_link(_, _) do
-    {:ok, []} = Application.ensure_all_started(:mnesia_ecto)
-    {:ok, self}
   end
 
   @behaviour Ecto.Adapter.Migration
@@ -99,12 +120,19 @@ defmodule Mnesia.Ecto do
       execute_ddl(repo, {:create, table, columns}, opts)
     end
   end
+
   def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
     fields = for {:add, field, _, _} <- columns do
       field
     end
-    {:atomic, :ok} = :mnesia.create_table(name, [attributes: fields])
+    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields)
     :ok
+  end
+
+  def execute_ddl(_, {:create, %Index{columns: columns, table: table}}, _) do
+    for attr <- columns do
+      {:atomic, :ok} = :mnesia.add_table_index(table, attr)
+    end
   end
 
   @doc false
