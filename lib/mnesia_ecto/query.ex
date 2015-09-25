@@ -11,20 +11,10 @@ defmodule Mnesia.Ecto.Query do
   List with specified fields only will be returned in matching result. Without
   the fields argument the whole objects would be returned.
   """
-  # TODO Refactor this clause to another name probably as returning whole
-  # objects. Update the @doc.
+  # TODO Refactor this clause to another name probably as the one returning
+  # whole objects. Update the @doc.
   def match_spec(table, filters) do
     [{to_record(filters, table, :_), [], [:'$_']}]
-  end
-
-  def match_spec(table, [], fields: :all) do
-    all_fields = table |> String.to_atom |> :mnesia.table_info(:attributes)
-    match_spec(table, [], fields: all_fields)
-  end
-
-  def match_spec(table, [], fields: fields) do
-    result = table |> placeholder4field |> Dict.take(fields)
-    [{match_head(table), [], [result]}]
   end
 
   def match_spec(table, fields, wheres: wheres) do
@@ -45,6 +35,9 @@ defmodule Mnesia.Ecto.Query do
   def resolve_params(guards, params) do resolve_params(guards, params, []) end
   def resolve_params([{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, Enum.at(params, index)} | acc])
+  end
+  def resolve_params([{operator, placeholder, val} | t], params, acc) do
+    resolve_params(t, params, [{operator, placeholder, val} | acc])
   end
   def resolve_params([], params, acc) do acc end
 
@@ -78,22 +71,15 @@ defmodule Mnesia.Ecto.Query do
     all_fields |> Enum.zip(placeholders)
   end
 
-  def result({:&, [], [0]}, table) do
-    table |> placeholder4field |> Dict.values
-  end
-
-  def result(ast = {{:., [], [{:&, [], [0]}, field]}, _, _}, table) do
-    result([ast], table)
-  end
-
-  def result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table) do
-    result(t, table, [field])
-  end
-
-  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc) do
-    result(t, table, [field | acc])
-  end
-
+  @doc """
+  Format result for Mnesia match spec according to queried fields.
+  """
+  def result(nil, _), do: [nil]
+  def result({:&, [], [0]}, table), do: table |> placeholder4field |> Dict.values
+  def result({{:., [], [{:&, [], [0]}, field]}, _, _} = ast, table), do: result([ast], table)
+  def result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table), do: result(t, table, [field])
+  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc), do: result(t, table, [field | acc])
+  def result(val, _), do: [val]
   defp result([], table, acc) do
     placeholders = placeholder4field(table)
     acc |> Enum.map(&Dict.get(placeholders, &1))
