@@ -38,6 +38,14 @@ defmodule Mnesia.Ecto do
   def embed_id(_), do: Ecto.UUID.generate
 
   @doc false
+  def dump(_, %{__struct__: _} = struct), do: {:ok, struct}
+  def dump(_, map) when is_map(map) do
+    map =
+      map
+      |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+      |> Enum.into %{}
+    {:ok, map}
+  end
   def dump(_, value), do: {:ok, value}
 
   @doc false
