@@ -14,7 +14,7 @@ defmodule Mnesia.Ecto.Query do
   # TODO Refactor this clause to another name probably as the one returning
   # whole objects. Update the @doc.
   def match_spec(table, filters) do
-    [{to_record(filters, table, :_), [], [:'$_']}]
+    [{keyword2record(filters, table, :_), [], [:'$_']}]
   end
 
   def match_spec(table, fields, wheres: wheres) do
@@ -39,7 +39,7 @@ defmodule Mnesia.Ecto.Query do
   def resolve_params([{operator, placeholder, val} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, val} | acc])
   end
-  def resolve_params([], params, acc) do acc end
+  def resolve_params([], _, acc) do acc end
 
   @doc """
   Convert Ecto `wheres` into Mnesia match spec guards.
@@ -49,7 +49,7 @@ defmodule Mnesia.Ecto.Query do
     guard = {operator, field2placeholder(field, table), parameter}
     wheres2guards(t, table, [guard | acc])
   end
-  defp wheres2guards([], table, acc) do acc end
+  defp wheres2guards([], _, acc) do acc end
 
   @doc """
   Return Mnesia match spec placeholder for field AST.
@@ -75,11 +75,11 @@ defmodule Mnesia.Ecto.Query do
   Format result for Mnesia match spec according to queried fields.
   """
   def result(nil, _), do: [nil]
-  def result({:&, [], [0]}, table), do: table |> placeholder4field |> Dict.values
-  def result({{:., [], [{:&, [], [0]}, field]}, _, _} = ast, table), do: result([ast], table)
+  def result({:&, [], [0]}, _), do: [:'$_'] # TODO Needs record2model in execute.
+  def result({{:., [], [{:&, [], [0]}, _]}, _, _} = ast, table), do: result([ast], table)
   def result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table), do: result(t, table, [field])
-  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc), do: result(t, table, [field | acc])
   def result(val, _), do: [val]
+  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc), do: result(t, table, [field | acc])
   defp result([], table, acc) do
     placeholders = placeholder4field(table)
     acc |> Enum.map(&Dict.get(placeholders, &1))
@@ -90,7 +90,7 @@ defmodule Mnesia.Ecto.Query do
 
   Populate missed fields with default value.
   """
-  def to_record(keyword, table, default \\ nil) do
+  def keyword2record(keyword, table, default \\ nil) do
     name_atom = String.to_atom(table)
     name_atom
     |> :mnesia.table_info(:attributes)
@@ -100,16 +100,23 @@ defmodule Mnesia.Ecto.Query do
   end
 
   @doc """
+  Convert Mnesia record object into Ecto Model.
+  """
+  def record2model(record, model) do
+    map =
+      record
+      |> record2keyword
+      |> Enum.into(%{})
+    Map.merge(model.__struct__, map)
+  end
+
+  @doc """
   Convert Mnesia record object into Keyword.
   """
-  def to_keyword(record) do
+  def record2keyword(record) do
     [table | values] = Tuple.to_list(record)
     :mnesia.table_info(table, :attributes)
     |> Enum.zip(values)
   end
 
-  def row2model(row, model) do
-    map = Enum.zip(model.__schema__(:fields), row) |> Enum.into(%{})
-    [Map.merge(model.__struct__, map)]
-  end
 end

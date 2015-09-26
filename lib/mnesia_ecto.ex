@@ -68,7 +68,9 @@ defmodule Mnesia.Ecto do
     spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
     rows = table |> String.to_atom |> :mnesia.dirty_select(spec)
     if expr == {:&, [], [0]} do
-      rows = rows |> Enum.map(&MnesiaQuery.row2model(&1, model))
+      rows = rows |> Enum.map(fn [record] ->
+        [MnesiaQuery.record2model(record, model)]
+      end)
     end
     {length(rows), rows}
   end
@@ -81,28 +83,28 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def insert(repo, meta, fields, {field, :binary_id, _}, [], opts) do
-    with_id = Keyword.put(fields, field, embed_id(:foo))
-    insert(repo, meta, with_id, nil, [], opts)
-  end
-
-  def insert(_, %{source: {_, table}}, fields, nil, _, _) do
-    row = MnesiaQuery.to_record(fields, table)
-    :ok = :mnesia.dirty_write(row)
-    {:ok, MnesiaQuery.to_keyword(row)}
-  end
-
-  @doc false
-  def update(_, %{source: {_, table}}, _, filters, _, _, _) do
+  def update(_, %{source: {_, table}} = meta, fields, filters, _, _, _) do
     table
     |> String.to_atom
     |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters))
     |> case do
       [] -> {:error, :stale}
-      [row] ->
-        :ok = :mnesia.dirty_delete_object(row)
-        {:ok, MnesiaQuery.to_keyword(row)}
+      [record] ->
+        to_insert = record |> MnesiaQuery.record2keyword |> Dict.merge(fields)
+        insert(nil, meta, to_insert, nil, nil, nil)
     end
+  end
+
+  @doc false
+  def insert(repo, meta, fields, {field, :binary_id, _}, [], opts) do
+    with_id = Keyword.put(fields, field, embed_id(nil))
+    insert(repo, meta, with_id, nil, [], opts)
+  end
+
+  def insert(_, %{source: {_, table}}, fields, nil, _, _) do
+    row = MnesiaQuery.keyword2record(fields, table)
+    :ok = :mnesia.dirty_write(row)
+    {:ok, MnesiaQuery.record2keyword(row)}
   end
 
   @doc false
@@ -113,8 +115,8 @@ defmodule Mnesia.Ecto do
     |> case do
       [] -> {:error, :stale}
       [row] ->
-        :ok = :mnesia.dirty_write(row)
-        {:ok, MnesiaQuery.to_keyword(row)}
+        :ok = :mnesia.dirty_delete_object(row)
+        {:ok, MnesiaQuery.record2keyword(row)}
     end
   end
 
