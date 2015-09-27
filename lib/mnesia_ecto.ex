@@ -59,8 +59,14 @@ defmodule Mnesia.Ecto do
     {:cache, {:all, MnesiaQuery.match_spec(table, fields, wheres: wheres)}}
   end
 
-  def prepare(:delete_all, %Query{from: {table, _}}) do
-    {:cache, {:delete_all, table}}
+  def prepare(:delete_all, %Query{from: {table, _}, wheres: []}) do
+    fun = fn ->
+      name_atom = String.to_atom(table)
+      size = :mnesia.table_info(name_atom, :size)
+      {:atomic, :ok} = :mnesia.clear_table(name_atom)
+      size
+    end
+    {:cache, {:delete_all, fun}}
   end
 
   @doc false
@@ -75,11 +81,8 @@ defmodule Mnesia.Ecto do
     {length(rows), rows}
   end
 
-  def execute(_, _, {:delete_all, table}, _, nil, _) do
-    {:atomic, :ok} =
-      table
-      |> String.to_atom
-      |> :mnesia.clear_table
+  def execute(_, _, {:delete_all, fun}, _, nil, _) do
+    {fun.(), nil}
   end
 
   @doc false
