@@ -5,8 +5,6 @@ defmodule Mnesia.Ecto do
 
   alias Ecto.Migration.Index
   alias Ecto.Migration.Table
-  alias Ecto.Query
-  alias Ecto.Query.SelectExpr
   alias Mnesia.Ecto.Query, as: MnesiaQuery
 
   @behaviour Ecto.Adapter.Storage
@@ -52,21 +50,31 @@ defmodule Mnesia.Ecto do
   def load(_, value), do: {:ok, value}
 
   @doc false
-  def prepare(:all, %Query{
-      from: {table, _},
-      select: %SelectExpr{expr: fields},
-      wheres: wheres}) do
-    {:cache, {:all, MnesiaQuery.match_spec(table, fields, wheres: wheres)}}
+  def prepare(:all, %{from: {table, _}, select: %{expr: fields}, wheres: wheres}) do
+    {:cache, {:all, MnesiaQuery.match_spec(table, fields: fields, wheres: wheres)}}
   end
 
-  def prepare(:delete_all, %Query{from: {table, _}, wheres: []}) do
-    fun = fn ->
-      name_atom = String.to_atom(table)
+  def prepare(:delete_all, %{from: {table, _}, wheres: []}) do
+    {:cache, {:delete_all, fn ->
+      name_atom = table |> String.to_atom
       size = :mnesia.table_info(name_atom, :size)
       {:atomic, :ok} = :mnesia.clear_table(name_atom)
-      size
-    end
-    {:cache, {:delete_all, fun}}
+      {size, nil}
+    end}}
+  end
+
+  def prepare(:delete_all, %{from: {table, _}, wheres: wheres}) do
+    {:cache, {:delete_all, fn ->
+      spec = MnesiaQuery.match_spec(table, wheres: wheres)
+      {_, size} =
+        table
+        |> String.to_atom
+        |> :mnesia.dirty_select(spec)
+        |> Enum.map_reduce(0, fn id, acc ->
+          {:mnesia.delete({table |> String.to_atom, id}), acc+1}
+        end)
+      {size, nil}
+    end}}
   end
 
   @doc false
@@ -82,14 +90,14 @@ defmodule Mnesia.Ecto do
   end
 
   def execute(_, _, {:delete_all, fun}, _, nil, _) do
-    {fun.(), nil}
+    fun.()
   end
 
   @doc false
   def update(_, %{source: {_, table}} = meta, fields, filters, _, _, _) do
     table
     |> String.to_atom
-    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters))
+    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters: filters))
     |> case do
       [] -> {:error, :stale}
       [record] ->
@@ -114,7 +122,7 @@ defmodule Mnesia.Ecto do
   def delete(_, %{source: {_, table}}, filters, _, _) do
     table
     |> String.to_atom
-    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters))
+    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters: filters))
     |> case do
       [] -> {:error, :stale}
       [row] ->

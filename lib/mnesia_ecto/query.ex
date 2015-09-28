@@ -13,12 +13,16 @@ defmodule Mnesia.Ecto.Query do
   """
   # TODO Refactor this clause to another name probably as the one returning
   # whole objects. Update the @doc.
-  def match_spec(table, filters) do
+  def match_spec(table, filters: filters) do
     [{keyword2record(filters, table, :_), [], [:'$_']}]
   end
 
-  def match_spec(table, fields, wheres: wheres) do
+  def match_spec(table, fields: fields, wheres: wheres) do
     [{match_head(table), wheres2guards(wheres, table), [result(fields, table)]}]
+  end
+
+  def match_spec(table, wheres: wheres) do
+    [{match_head(table), wheres2guards(wheres, table), [:'$1']}]
   end
 
   def match_head(table) do
@@ -30,16 +34,16 @@ defmodule Mnesia.Ecto.Query do
   end
 
   @doc """
-  Replace AST of `wheres` parameters with values on `execute` stage.
+  Replace AST of `wheres` with parameters.
   """
   def resolve_params(guards, params) do resolve_params(guards, params, []) end
-  def resolve_params([{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
+  defp resolve_params([{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, Enum.at(params, index)} | acc])
   end
-  def resolve_params([{operator, placeholder, val} | t], params, acc) do
+  defp resolve_params([{operator, placeholder, val} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, val} | acc])
   end
-  def resolve_params([], _, acc) do acc end
+  defp resolve_params([], _, acc) do acc end
 
   @doc """
   Convert Ecto `wheres` into Mnesia match spec guards.
