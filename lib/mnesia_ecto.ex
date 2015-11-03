@@ -11,6 +11,7 @@ defmodule Mnesia.Ecto do
 
   @doc false
   def storage_up(_opts) do
+    :mnesia.stop
     :mnesia.create_schema([node])
     :mnesia.start
   end
@@ -28,8 +29,14 @@ defmodule Mnesia.Ecto do
 
   @doc false
   def start_link(_, _) do
-    {:ok, [:mnesia_ecto]} = Application.ensure_all_started(:mnesia_ecto)
+    {:ok, _} = Application.ensure_all_started(:mnesia_ecto)
     {:ok, self}
+  end
+
+  @doc false
+  def stop(_, _) do
+    :mnesia.stop
+    :ok
   end
 
   @doc false
