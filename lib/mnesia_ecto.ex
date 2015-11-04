@@ -154,10 +154,8 @@ defmodule Mnesia.Ecto do
   end
 
   def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
-    fields = for {:add, field, _, _} <- columns do
-      field
-    end
-    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields)
+    fields = for {:add, field, _, _} <- columns, do: field
+    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields, disc_copies: [node])
     :ok
   end
 
