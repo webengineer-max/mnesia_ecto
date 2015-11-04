@@ -35,7 +35,7 @@ defmodule Mnesia.Ecto do
 
   @doc false
   def stop(_, _) do
-    :mnesia.stop
+    :stopped = :mnesia.stop
     :ok
   end
 
