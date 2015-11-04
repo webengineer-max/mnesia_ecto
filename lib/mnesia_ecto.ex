@@ -114,6 +114,10 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
+  def insert(_, _, _, {_, :id, _}, _, _) do
+    raise "only :binary_id type supported for autogenerate_id"
+  end
+
   def insert(repo, meta, fields, {field, :binary_id, _}, [], opts) do
     with_id = Keyword.put(fields, field, embed_id(nil))
     insert(repo, meta, with_id, nil, [], opts)
