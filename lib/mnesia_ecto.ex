@@ -40,7 +40,8 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def embed_id(_), do: Ecto.UUID.generate
+  def embed_id(nil), do: Ecto.UUID.generate
+  def embed_id(id), do: id
 
   @doc false
   def dump(_, %{__struct__: _} = struct), do: {:ok, struct}
@@ -118,8 +119,8 @@ defmodule Mnesia.Ecto do
     raise "only :binary_id type supported for autogenerate_id"
   end
 
-  def insert(repo, meta, fields, {field, :binary_id, _}, [], opts) do
-    with_id = Keyword.put(fields, field, embed_id(nil))
+  def insert(repo, meta, fields, {field, :binary_id, value}, [], opts) do
+    with_id = Keyword.put(fields, field, embed_id(value))
     insert(repo, meta, with_id, nil, [], opts)
   end
 
