@@ -144,6 +144,13 @@ defmodule Mnesia.Ecto do
 
   @behaviour Ecto.Adapter.Migration
 
+  defp disc_copies do
+    case :mnesia.system_info(:use_dir) do
+      true -> [node]
+      false -> []
+    end
+  end
+
   @doc false
   def execute_ddl(repo,
                   {:create_if_not_exists, table=%Table{name: name}, columns},
@@ -155,7 +162,7 @@ defmodule Mnesia.Ecto do
 
   def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
     fields = for {:add, field, _, _} <- columns, do: field
-    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields, disc_copies: [node])
+    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields, disc_copies: disc_copies)
     :ok
   end
 
