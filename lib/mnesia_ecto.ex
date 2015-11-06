@@ -3,8 +3,6 @@ defmodule Mnesia.Ecto do
   Mnesia adapter for Ecto.
   """
 
-  alias Ecto.Migration.Index
-  alias Ecto.Migration.Table
   alias Mnesia.Ecto.Query, as: MnesiaQuery
 
   @behaviour Ecto.Adapter.Storage
@@ -58,8 +56,10 @@ defmodule Mnesia.Ecto do
   def load(_, value), do: {:ok, value}
 
   @doc false
-  def prepare(:all, %{from: {table, _}, select: %{expr: fields}, wheres: wheres}) do
-    {:cache, {:all, MnesiaQuery.match_spec(table, fields: fields, wheres: wheres)}}
+  def prepare(:all, %{from: {table, _}, select: %{expr: fields},
+              wheres: wheres}) do
+    {:cache, {:all, MnesiaQuery.match_spec(table, fields: fields,
+              wheres: wheres)}}
   end
 
   def prepare(:delete_all, %{from: {table, _}, wheres: []}) do
@@ -86,7 +86,8 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def execute(_, %{select: %{expr: expr}, sources: {{table, model}}}, {:all, [{match_head, guards, result}]}, params, _, _) do
+  def execute(_, %{select: %{expr: expr}, sources: {{table, model}}},
+              {:all, [{match_head, guards, result}]}, params, _, _) do
     spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
     rows = table |> String.to_atom |> :mnesia.dirty_select(spec)
     if expr == {:&, [], [0]} do
@@ -153,21 +154,21 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def execute_ddl(repo,
-                  {:create_if_not_exists, table=%Table{name: name}, columns},
+  def execute_ddl(repo, {:create_if_not_exists, table=%{name: name}, columns},
                   opts) do
     unless name in :mnesia.system_info(:tables) do
       execute_ddl(repo, {:create, table, columns}, opts)
     end
   end
 
-  def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
+  def execute_ddl(_, {:create, %{name: name}, columns}, _) do
     fields = for {:add, field, _, _} <- columns, do: field
-    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields, disc_copies: disc_copies)
+    {:atomic, :ok} = :mnesia.create_table(name, attributes: fields,
+                                          disc_copies: disc_copies)
     :ok
   end
 
-  def execute_ddl(_, {:create, %Index{columns: columns, table: table}}, _) do
+  def execute_ddl(_, {:create, %{columns: columns, table: table}}, _) do
     for attr <- columns do
       {:atomic, :ok} = :mnesia.add_table_index(table, attr)
     end

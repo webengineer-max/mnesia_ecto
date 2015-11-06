@@ -3,8 +3,6 @@ defmodule Mnesia.Ecto.Query do
   Translate between Ecto and Mnesia query languages.
   """
 
-  alias Ecto.Query.QueryExpr
-
   @doc """
   Return match specification for Mnesia table.
 
@@ -37,8 +35,10 @@ defmodule Mnesia.Ecto.Query do
   Replace AST of `wheres` with parameters.
   """
   def resolve_params(guards, params) do resolve_params(guards, params, []) end
-  defp resolve_params([{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
-    resolve_params(t, params, [{operator, placeholder, Enum.at(params, index)} | acc])
+  defp resolve_params(
+      [{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
+    resolve_params(
+      t, params, [{operator, placeholder, Enum.at(params, index)} | acc])
   end
   defp resolve_params([{operator, placeholder, val} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, val} | acc])
@@ -49,7 +49,8 @@ defmodule Mnesia.Ecto.Query do
   Convert Ecto `wheres` into Mnesia match spec guards.
   """
   def wheres2guards(wheres, table) do wheres2guards(wheres, table, []) end
-  defp wheres2guards([%QueryExpr{expr: {operator, [], [field, parameter]}} | t], table, acc) do
+  defp wheres2guards([%{expr: {operator, [], [field, parameter]}} | t], table,
+                     acc) do
     guard = {operator, field2placeholder(field, table), parameter}
     wheres2guards(t, table, [guard | acc])
   end
@@ -78,12 +79,30 @@ defmodule Mnesia.Ecto.Query do
   @doc """
   Format result for Mnesia match spec according to queried fields.
   """
-  def result(nil, _), do: [nil]
-  def result({:&, [], [0]}, _), do: [:'$_'] # TODO Needs record2model in execute.
-  def result({{:., [], [{:&, [], [0]}, _]}, _, _} = ast, table), do: result([ast], table)
-  def result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table), do: result(t, table, [field])
-  def result(val, _), do: [val]
-  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc), do: result(t, table, [field | acc])
+  def result(nil, _) do
+    [nil]
+  end
+
+  def result({:&, [], [0]}, _) do
+    [:'$_'] # TODO For record2model in execute.
+  end
+
+  def result({{:., [], [{:&, [], [0]}, _]}, _, _} = ast, table) do
+    result([ast], table)
+  end
+
+  def result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table) do
+    result(t, table, [field])
+  end
+
+  def result(val, _) do
+    [val]
+  end
+
+  defp result([{{:., [], [{:&, [], [0]}, field]}, _, _} | t], table, acc) do
+    result(t, table, [field | acc])
+  end
+
   defp result([], table, acc) do
     placeholders = placeholder4field(table)
     acc |> Enum.map(&Dict.get(placeholders, &1))
@@ -119,8 +138,7 @@ defmodule Mnesia.Ecto.Query do
   """
   def record2keyword(record) do
     [table | values] = Tuple.to_list(record)
-    :mnesia.table_info(table, :attributes)
-    |> Enum.zip(values)
+    table |> :mnesia.table_info(:attributes) |> Enum.zip(values)
   end
 
 end
