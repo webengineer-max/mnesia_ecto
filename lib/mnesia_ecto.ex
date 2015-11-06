@@ -171,6 +171,12 @@ defmodule Mnesia.Ecto do
     for attr <- columns do
       {:atomic, :ok} = :mnesia.add_table_index(table, attr)
     end
+    :ok
+  end
+
+  def execute_ddl(_, {:drop, %{name: name}}, _) do
+    {:atomic, :ok} = :mnesia.delete_table(name)
+    :ok
   end
 
   @doc false
