@@ -34,16 +34,23 @@ defmodule Mnesia.Ecto.Query do
   @doc """
   Replace AST of `wheres` with parameters.
   """
-  def resolve_params(guards, params) do resolve_params(guards, params, []) end
+  def resolve_params(guards, params) do
+    resolve_params(guards, params, [])
+  end
+
   defp resolve_params(
       [{operator, placeholder, {:^, [], [index]}} | t], params, acc) do
     resolve_params(
       t, params, [{operator, placeholder, Enum.at(params, index)} | acc])
   end
+
   defp resolve_params([{operator, placeholder, val} | t], params, acc) do
     resolve_params(t, params, [{operator, placeholder, val} | acc])
   end
-  defp resolve_params([], _, acc) do acc end
+
+  defp resolve_params([], _, acc) do
+    acc
+  end
 
   @doc """
   Convert Ecto `wheres` into Mnesia match spec guards.

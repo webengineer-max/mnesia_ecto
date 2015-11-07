@@ -62,27 +62,8 @@ defmodule Mnesia.Ecto do
               wheres: wheres)}}
   end
 
-  def prepare(:delete_all, %{from: {table, _}, wheres: []}) do
-    {:cache, {:delete_all, fn ->
-      name_atom = table |> String.to_atom
-      size = :mnesia.table_info(name_atom, :size)
-      {:atomic, :ok} = :mnesia.clear_table(name_atom)
-      {size, nil}
-    end}}
-  end
-
-  def prepare(:delete_all, %{from: {table, _}, wheres: wheres}) do
-    {:cache, {:delete_all, fn ->
-      spec = MnesiaQuery.match_spec(table, wheres: wheres)
-      {_, size} =
-        table
-        |> String.to_atom
-        |> :mnesia.dirty_select(spec)
-        |> Enum.map_reduce(0, fn id, acc ->
-          {:mnesia.delete({table |> String.to_atom, id}), acc+1}
-        end)
-      {size, nil}
-    end}}
+  def prepare(:delete_all, %{from: {table, _}, select: nil, wheres: wheres}) do
+    {:cache, {:delete_all, MnesiaQuery.match_spec(table, wheres: wheres)}}
   end
 
   @doc false
@@ -98,8 +79,18 @@ defmodule Mnesia.Ecto do
     {length(rows), rows}
   end
 
-  def execute(_, _, {:delete_all, fun}, _, nil, _) do
-    fun.()
+  def execute(_, %{sources: {{table, _}}},
+              {:delete_all, [{_, [{:==, :"$1", {:^, [], [0]}}], _}]}, params, _, _) do
+    table_atom = table |> String.to_atom
+    params |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
+  end
+
+  def execute(_, %{sources: {{table, _}}},
+              {:delete_all, [{match_head, guards, result}]}, params, _, _) do
+    spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
+    table_atom = table |> String.to_atom
+    table_atom |> :mnesia.dirty_select(spec)
+    |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
   end
 
   @doc false
