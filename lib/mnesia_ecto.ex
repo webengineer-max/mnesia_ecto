@@ -94,16 +94,21 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def update(_, %{source: {_, table}} = meta, fields, filters, _, _, _) do
-    table
-    |> String.to_atom
-    |> :mnesia.dirty_select(MnesiaQuery.match_spec(table, filters: filters))
-    |> case do
-      [] -> {:error, :stale}
-      [record] ->
-        to_insert = record |> MnesiaQuery.record2keyword |> Dict.merge(fields)
-        insert(nil, meta, to_insert, nil, nil, nil)
+  def update(_, %{source: {_, table}}, fields, filters, _, _, _) do
+    do_update = fn ->
+      table |> String.to_atom
+      |> :mnesia.select(MnesiaQuery.match_spec(table, filters: filters))
+      |> case do
+        [] -> {:error, :stale}
+        [record] ->
+          row = record |> MnesiaQuery.record2keyword |> Dict.merge(fields)
+            |> MnesiaQuery.keyword2record(table)
+          :ok = :mnesia.write(row)
+          {:ok, MnesiaQuery.record2keyword(row)}
+      end
     end
+    {:atomic, result} = do_update |> :mnesia.transaction
+    result
   end
 
   @doc false
