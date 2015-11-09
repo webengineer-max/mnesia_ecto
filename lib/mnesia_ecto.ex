@@ -123,8 +123,21 @@ defmodule Mnesia.Ecto do
 
   def insert(_, %{source: {_, table}}, fields, nil, _, _) do
     row = MnesiaQuery.keyword2record(fields, table)
-    :ok = :mnesia.dirty_write(row)
-    {:ok, MnesiaQuery.record2keyword(row)}
+    table_atom = table |> String.to_atom
+    key = table_atom |> :mnesia.table_info(:attributes) |> Enum.at(1)
+    match_head = table_atom |> :mnesia.table_info(:wild_pattern)
+      |> put_elem(1, elem(row, 1))
+    do_insert = fn ->
+      table_atom |> :mnesia.select([{match_head, [], [:taken]}])
+      |> case do
+        [:taken] -> {:invalid, [{key, "has already been taken"}]}
+        [] ->
+          :ok = :mnesia.write(row)
+          {:ok, MnesiaQuery.record2keyword(row)}
+      end
+    end
+    {:atomic, result} = do_insert |> :mnesia.transaction
+    result
   end
 
   @doc false
