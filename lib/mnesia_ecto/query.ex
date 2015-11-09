@@ -23,7 +23,7 @@ defmodule Mnesia.Ecto.Query do
     [{match_head(table), wheres2guards(wheres, table), [:'$1']}]
   end
 
-  def match_head(table) do
+  defp match_head(table) do
     table
     |> placeholder4field
     |> Dict.values

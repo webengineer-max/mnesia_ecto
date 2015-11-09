@@ -80,7 +80,8 @@ defmodule Mnesia.Ecto do
   end
 
   def execute(_, %{sources: {{table, _}}},
-              {:delete_all, [{_, [{:==, :"$1", {:^, [], [0]}}], _}]}, params, _, _) do
+              {:delete_all, [{_, [{:==, :"$1", {:^, [], [0]}}], _}]}, params,
+              _, _) do
     table_atom = table |> String.to_atom
     params |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
   end
