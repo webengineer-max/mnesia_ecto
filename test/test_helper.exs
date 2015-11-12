@@ -11,15 +11,18 @@ Code.require_file "../deps/ecto/integration_test/support/migration.exs", __DIR__
 defmodule Ecto.Integration.Case do
   use ExUnit.CaseTemplate
 
-  setup_all do
-    # Run with schema in RAM to avoid clashing with server
-    :mnesia.start
+  setup do
+    :tables |> :mnesia.system_info
+      |> Enum.filter(&(&1 != :schema and &1 != :schema_migrations))
+      |> Enum.map(&:mnesia.clear_table/1)
+    :ok
   end
 end
 
 alias Ecto.Integration.TestRepo
 
 Application.put_env(:ecto, TestRepo, adapter: Mnesia.Ecto)
+Application.put_env(:mnesia, :schema_location, :ram)
 
 defmodule Ecto.Integration.TestRepo do
   use Ecto.Integration.Repo, otp_app: :ecto
