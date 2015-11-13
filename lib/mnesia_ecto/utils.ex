@@ -10,7 +10,7 @@ defmodule Mnesia.Ecto.Utils do
   with a slug derived from `src_field`.
   """
   def slugify(changeset, src_field, dst_field) do
-    table = :source |> changeset.model.__struct__.__schema__ |> String.to_atom
+    table = :source |> changeset.model.__struct__.__schema__
     slug = changeset.changes[src_field] |> Mnesia.KeyGen.slug(table, dst_field)
     %{changeset | changes: Map.put(changeset.changes, dst_field, slug)}
   end

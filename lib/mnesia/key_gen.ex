@@ -11,7 +11,13 @@ defmodule Mnesia.KeyGen do
   There is no guarantee for slug uniqueness through time. I.e. slug may be
   reused after deletion.
   """
-  def slug(phrase, table, attribute \\ :key) do
+  def slug(phrase, table, attribute \\ :key)
+
+  def slug(phrase, table, attribute) when is_binary(table) do
+    slug(phrase, String.to_atom(table), attribute)
+  end
+
+  def slug(phrase, table, attribute) do
     condensed = phrase |> String.downcase
       |> String.replace(~r/[^a-z0-9]+/, "-") |> String.strip(?-)
     wild = table |> :mnesia.table_info(:wild_pattern)
