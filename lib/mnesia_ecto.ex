@@ -3,19 +3,21 @@ defmodule Mnesia.Ecto do
   Mnesia adapter for Ecto.
   """
 
+  alias Ecto.Migration.Index
+  alias Ecto.Migration.Table
   alias Mnesia.Ecto.Query, as: MnesiaQuery
 
   @behaviour Ecto.Adapter.Storage
 
   @doc false
-  def storage_up(_opts) do
+  def storage_up(_) do
     :mnesia.stop
     :mnesia.create_schema([node])
     :mnesia.start
   end
 
   @doc false
-  def storage_down(_opts) do
+  def storage_down(_) do
     :mnesia.stop
     :mnesia.delete_schema([node])
   end
@@ -164,29 +166,54 @@ defmodule Mnesia.Ecto do
   end
 
   @doc false
-  def execute_ddl(repo, {:create_if_not_exists, table=%{name: name}, columns},
+  def execute_ddl(repo,
+                  {:create_if_not_exists, %Table{name: name} = table, columns},
                   opts) do
     unless name in :mnesia.system_info(:tables) do
       execute_ddl(repo, {:create, table, columns}, opts)
     end
   end
 
-  def execute_ddl(_, {:create, %{name: name}, columns}, _) do
+  def execute_ddl(_, {:create, %Table{name: name}, columns}, _) do
     fields = for {:add, field, _, _} <- columns, do: field
     {:atomic, :ok} = :mnesia.create_table(name, attributes: fields,
                                           disc_copies: disc_copies)
     :ok
   end
 
-  def execute_ddl(_, {:create, %{columns: columns, table: table}}, _) do
+  def execute_ddl(_, {:create, %Index{table: table, columns: columns}}, _) do
     for attr <- columns do
       {:atomic, :ok} = :mnesia.add_table_index(table, attr)
     end
     :ok
   end
 
-  def execute_ddl(_, {:drop, %{name: name}}, _) do
+  def execute_ddl(_, {:drop, %Table{name: name}}, _) do
     {:atomic, :ok} = :mnesia.delete_table(name)
+    :ok
+  end
+
+  def execute_ddl(_, {:drop_if_exists, %Table{name: name}}, _) do
+    if :tables |> :mnesia.system_info |> Enum.member?(name) do
+      {:atomic, :ok} = :mnesia.delete_table(name)
+    end
+    :ok
+  end
+
+  def execute_ddl(_, {:drop, %Index{table: table, columns: columns}}, _) do
+    for attr <- columns do
+      {:atomic, :ok} = :mnesia.del_table_index(table, attr)
+    end
+    :ok
+  end
+
+  def execute_ddl(_, {:drop_if_exists, %Index{table: table, columns: columns}}, _) do
+    attrs = table |> :mnesia.table_info(:attributes)
+    indexes = table |> :mnesia.table_info(:index) |> Enum.map(&(&1 - 2))
+      |> Enum.map(&Enum.fetch(attrs, &1))
+    for attr <- columns, attr in indexes do
+      {:atomic, :ok} = :mnesia.del_table_index(table, attr)
+    end
     :ok
   end
 
