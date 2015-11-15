@@ -85,15 +85,18 @@ defmodule Mnesia.Ecto do
               {:delete_all, [{_, [{:==, :"$1", {:^, [], [0]}}], _}]}, params,
               _, _) do
     table_atom = table |> String.to_atom
-    params |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
+    deleted = params |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
+      |> Enum.count
+    {deleted, nil}
   end
 
   def execute(_, %{sources: {{table, _}}},
               {:delete_all, [{match_head, guards, result}]}, params, _, _) do
     spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
     table_atom = table |> String.to_atom
-    table_atom |> :mnesia.dirty_select(spec)
-    |> Enum.map(&:mnesia.dirty_delete(table_atom, &1))
+    deleted = table_atom |> :mnesia.dirty_select(spec)
+      |> Enum.map(&:mnesia.dirty_delete(table_atom, &1)) |> Enum.count
+    {deleted, nil}
   end
 
   @doc false
