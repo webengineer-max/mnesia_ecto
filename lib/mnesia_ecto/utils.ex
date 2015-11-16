@@ -1,6 +1,6 @@
 defmodule Mnesia.Ecto.Utils do
   @moduledoc """
-  Useful tools shared among projects.
+  Useful tools.
   """
 
   @doc """
@@ -14,5 +14,6 @@ defmodule Mnesia.Ecto.Utils do
     slug = changeset.changes[src_field] |> Mnesia.KeyGen.slug(table, dst_field)
     %{changeset | changes: Map.put(changeset.changes, dst_field, slug)}
   end
+  def slugify(changeset, field), do: slugify(changeset, field, field)
 
 end
