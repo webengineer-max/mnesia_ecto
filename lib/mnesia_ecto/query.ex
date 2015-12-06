@@ -112,7 +112,7 @@ defmodule Mnesia.Ecto.Query do
 
   defp result([], table, acc) do
     placeholders = placeholder4field(table)
-    acc |> Enum.map(&Dict.get(placeholders, &1))
+    acc |> Enum.reverse |> Enum.map(&Dict.get(placeholders, &1))
   end
 
   @doc """
