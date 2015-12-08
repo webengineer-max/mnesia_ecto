@@ -116,6 +116,27 @@ defmodule Mnesia.Ecto.Query do
   end
 
   @doc """
+  Return placeholers in select result to be used for ordering.
+  """
+  def order_bys2placeholders([], _), do: []
+  def order_bys2placeholders(order_bys, table), do: order_bys2placeholders(order_bys, table, [])
+  def order_bys2placeholders([%{expr: [asc: {{:., [], [{:&, [], [0]}, field]}, _,
+          _}]} | t], table, acc) do
+    placeholder = table |> placeholder4field |> Dict.get(field)
+    order_bys2placeholders(t, table, [placeholder | acc])
+  end
+  def order_bys2placeholders([], _, acc), do: acc |> Enum.reverse
+
+  @doc """
+  Order selected rows according to placeholders position in result.
+  """
+  def reorder(rows, [], _), do: rows
+  def reorder(rows, [order_by], [result_placeholders]) do
+    position = result_placeholders |> Enum.find_index(&(&1==order_by))
+    rows |> Enum.sort_by(&Enum.at(&1, position))
+  end
+
+  @doc """
   Convert Keyword into table record.
 
   Populate missed fields with default value.

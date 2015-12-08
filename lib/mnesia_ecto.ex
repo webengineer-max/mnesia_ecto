@@ -59,9 +59,9 @@ defmodule Mnesia.Ecto do
 
   @doc false
   def prepare(:all, %{from: {table, _}, select: %{expr: fields},
-              wheres: wheres}) do
+                      wheres: wheres, order_bys: order_bys}) do
     {:cache, {:all, MnesiaQuery.match_spec(table, fields: fields,
-              wheres: wheres)}}
+          wheres: wheres), MnesiaQuery.order_bys2placeholders(order_bys, table)}}
   end
 
   def prepare(:delete_all, %{from: {table, _}, select: nil, wheres: wheres}) do
@@ -70,9 +70,10 @@ defmodule Mnesia.Ecto do
 
   @doc false
   def execute(_, %{select: %{expr: expr}, sources: {{table, model}}},
-              {:all, [{match_head, guards, result}]}, params, _, _) do
+              {:all, [{match_head, guards, result}], ordering_placeholders}, params, _, _) do
     spec = [{match_head, MnesiaQuery.resolve_params(guards, params), result}]
     rows = table |> String.to_atom |> :mnesia.dirty_select(spec)
+      |> MnesiaQuery.reorder(ordering_placeholders, result)
     if expr == {:&, [], [0]} do
       rows = rows |> Enum.map(fn [record] ->
         [MnesiaQuery.record2model(record, model)]
