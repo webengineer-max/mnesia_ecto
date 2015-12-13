@@ -22,7 +22,6 @@ end
 alias Ecto.Integration.TestRepo
 
 Application.put_env(:ecto, TestRepo, adapter: Mnesia.Ecto)
-Application.put_env(:mnesia, :schema_location, :ram)
 
 defmodule Ecto.Integration.TestRepo do
   use Ecto.Integration.Repo, otp_app: :ecto

@@ -162,13 +162,6 @@ defmodule Mnesia.Ecto do
 
   @behaviour Ecto.Adapter.Migration
 
-  defp disc_copies do
-    case :mnesia.system_info(:use_dir) do
-      true -> [node]
-      false -> []
-    end
-  end
-
   @doc false
   def execute_ddl(repo,
                   {:create_if_not_exists, %Table{name: name} = table, columns},
@@ -219,6 +212,13 @@ defmodule Mnesia.Ecto do
       {:atomic, :ok} = :mnesia.del_table_index(table, attr)
     end
     :ok
+  end
+
+  defp disc_copies do
+    case :mnesia.system_info(:use_dir) do
+      true -> [node]
+      false -> []
+    end
   end
 
   @doc false
